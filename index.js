@@ -16,22 +16,20 @@ io.on('connection', socket => {
     console.log('client connected');
 
     /*==================AGENT=============================*/
-    socket.on('create free space', ({username}) => {
+    socket.on('create free space request', ({username}) => {
         availableAgents[username] = socket.id;
     })
     
     /*==================USER==============================*/
-    socket.on('join free space', ({username, userId}) => {
+    socket.on('join free space request', ({username}) => {
         socketOperations.setUser(username);
 
         // assign user to available agent
         if (availableAgents.length > 0){
 
-            // inform agent of new user (customer) OR figure a way to retrieve agent's socket object using his socket id
             var agentUsername = Object.keys(availableAgents)[0];
             var agentSocketId = availableAgents[agentUsername];
             var agentSocketObj = io.sockets.connected[agentSocketId];
-            agentSocketId.emit('user joined space', username);
 
             // move agent from availableAgents list to occupiedAgents list
             occupiedAgents[agentUsername] = agentSocketId;
@@ -43,10 +41,10 @@ io.on('connection', socket => {
             agentSocketObj.join(roomKey);
 
             // return room key to both user and agent
-            socket.to(roomKey).emit('room key', {roomKey, agentUsername, userUsername: username})
+            socket.to(roomKey).emit('new room success', {roomKey, agentUsername, customerUsername: username})
         } else {
             // inform user that there are no available agents at the moment
-            socket.emit('room key', null)
+            socket.emit('new room failure', null)
         }
       });
 
@@ -58,19 +56,19 @@ io.on('connection', socket => {
         var roomActive = true;
         if (roomActive){
             socket.join(roomKey)
-            socket.emit('room key', roomKey)
+            socket.emit('reconnection success', roomKey)
         } else {
-            socket.emit('room key', null)
+            socket.emit('reconnection failure', null)
         }
     })
 
-    socket.on('new message', ({message, roomKey}) => {
-        socket.to(roomKey).emit('new message received', {message, from: socket.user})
+    socket.on('send message', ({message, roomKey}) => {
+        socket.to(roomKey).emit('received message', {message, sender: socket.user})
     })
 
     socket.on('leave room', (roomKey) => {
         socket.leave(roomKey);
-        socket.to(roomKey).emit('user left', {message: socket.user + ' left'})
+        socket.to(roomKey).emit('user left', {user: socket.user})
     })
 
 })
